@@ -16,6 +16,8 @@ local set_activity = status.set_activity
 
 local M = {}
 local dialog_generation = 0
+local history_messages
+local history_waiting = false
 
 function M.send(frame, initializing)
   if state.job and (state.ready or initializing) then
@@ -64,13 +66,28 @@ local function update_jobs(jobs, delivered)
   vim.cmd("redrawstatus")
 end
 
+local function request_history()
+  history_messages = {}
+  history_waiting = false
+  M.send({ type = "get_messages_page" }, true)
+end
+local function finish_history(messages)
+  history.restore(restore_history(messages))
+  history_messages = nil
+  state.displayed_session_id = state.session_id
+  state.ready = true
+  append({ "Agent connected: " .. state.session_name })
+  refresh_statusline()
+end
+
+
 local function finish_session_open()
   if state.displayed_session_id == state.session_id then
     state.ready = true
     append({ "Agent reconnected: " .. state.session_name })
     refresh_statusline()
   else
-    M.send({ type = "get_messages" }, true)
+    request_history()
   end
 end
 
@@ -90,13 +107,25 @@ local function handle(frame)
     local task = frame.payload
     update_task(task.progress.id, task.index, task.progress.status, task.task or task.agent)
   elseif frame.type == "response" and not frame.success then
+    if frame.command == "get_messages_page" and frame.code == "stale_cursor" then
+      request_history()
+      return
+    elseif frame.command == "get_messages_page" and frame.code == "session_busy" then
+      history_messages = nil
+      history_waiting = true
+      return
+    elseif frame.command == "get_messages_page" and frame.error == "Unknown command: get_messages_page" then
+      history_messages = nil
+      M.send({ type = "get_messages" }, true)
+      return
+    end
     append({ "Agent error: " .. tostring(frame.error) }, { [1] = "DiagnosticError" })
     if frame.command == "new_session" and state.new_requested then
       state.new_requested = nil
     elseif frame.command == "open_session" or frame.command == "new_session"
       or frame.command == "set_session_name" or (frame.command == "get_state" and not state.ready) then
       vim.fn.jobstop(state.job)
-    elseif frame.command == "get_messages" then
+    elseif frame.command == "get_messages_page" or frame.command == "get_messages" then
       state.ready = false
       vim.fn.jobstop(state.job)
     end
@@ -142,12 +171,15 @@ local function handle(frame)
     end
   elseif frame.type == "response" and frame.command == "set_session_name" then
     finish_session_open()
+  elseif frame.type == "response" and frame.command == "get_messages_page" then
+    vim.list_extend(history_messages, frame.data.messages)
+    if frame.data.nextCursor then
+      M.send({ type = "get_messages_page", cursor = frame.data.nextCursor }, true)
+    else
+      finish_history(history_messages)
+    end
   elseif frame.type == "response" and frame.command == "get_messages" then
-    history.restore(restore_history(frame.data.messages))
-    state.displayed_session_id = state.session_id
-    state.ready = true
-    append({ "Agent connected: " .. state.session_name })
-    refresh_statusline()
+    finish_history(frame.data.messages)
   elseif frame.type == "response" and frame.command == "set_subagent_subscription" then
     M.send({ type = "get_subagents" }, true)
   elseif frame.type == "response" and frame.command == "get_subagents" then
@@ -200,6 +232,7 @@ local function handle(frame)
     state.running_jobs = {}
     state.running_commands = {}
     vim.cmd("redrawstatus")
+    if history_waiting then request_history() end
   elseif frame.type == "agent_start" then
     set_activity("Working")
   elseif frame.type == "command_output" then
@@ -309,6 +342,8 @@ function M.start()
   state.ready = false
   state.new_requested = nil
   state.new_state_id = nil
+  history_messages = nil
+  history_waiting = false
   set_activity(nil)
   state.partial = ""
   state.session = nil
@@ -359,6 +394,8 @@ function M.start()
       state.ready = false
       state.new_requested = nil
       state.new_state_id = nil
+      history_messages = nil
+      history_waiting = false
       state.session = nil
       state.stats = nil
       state.running_tasks = {}

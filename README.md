@@ -16,18 +16,40 @@ nnoremap <silent> <leader>o :lua require('omp').open()<CR>
 
 ## Key bindings
 
-- `<Esc>` then `<Enter>` — send prompt; insert-mode `<Enter>` — newline.
-- `<C-c>` — abort response (prompt normal mode).
-- `<Up>`/`<Down>` (normal/insert), `k`/`j` (normal) — browse prompt history at first/last line; `Down` past newest restores draft.
-- `i` (transcript) — edit prompt; `:q` — close pane.
-- Approval choices: `j`/`k` or arrows, then `<Enter>`; `q` or `<Esc>` dismisses. Input dialogs use `<Enter>` to submit and `<Esc>` to cancel.
+### Prompt
+
+| Mode | Keys | Action |
+| --- | --- | --- |
+| Normal | `<Enter>` | Send prompt. From insert mode, press `<Esc>` first. |
+| Insert | `<Enter>` | Insert newline. |
+| Normal | `<C-c>` | Abort response. |
+| Normal or insert | `<Up>` / `<Down>` | Browse history at first/last prompt line. `<Down>` past newest restores draft. |
+| Normal | `k` / `j` | Browse history at first/last prompt line. |
+
+### Transcript
+
+| Keys | Action |
+| --- | --- |
+| `i` | Edit prompt. |
+| `:q` | Close pane. |
+
+### Dialogs
+
+| Dialog | Keys | Action |
+| --- | --- | --- |
+| Choices and approvals | `j` / `k` or arrows, then `<Enter>` | Select option. |
+| Choices and approvals | `q` or `<Esc>` | Dismiss. |
+| Input | `<Enter>` | Submit text. |
+| Input | `<Esc>` | Cancel. |
+| Multiline editor | `<Enter>` in normal mode | Submit text. |
+| Multiline editor | `q` in normal mode | Cancel. |
 
 ## Features
 
-- Independent transcript scroll, multiline prompt, Markdown and tool output, approvals and todos.
+- Independent transcript scroll, multiline prompt and error display, Markdown and tool output, approvals and todos.
 - Statusline: model, thinking, context, cost, activity; divider above prompt: running tasks, active commands, and named background bash/eval jobs.
 - RPC edit diffs use `difft` when available; unified-diff fallback.
-- Per-project sessions resume on reopen. History: 100 prompts from current RPC session, not terminal's global history.
+- Per-project sessions resume on reopen; large histories use paged RPC when available. Prompt history: 100 prompts from current RPC session, not terminal's global history.
 - Prompt stays editable during tool calls, including `wait`. Send a message to steer; OMP interrupts an interruptible wait, backgrounds the still-running command, and handles the message. Background jobs leave the divider when their result arrives. Changed clean file buffers reload after tools.
 
 ## Special commands

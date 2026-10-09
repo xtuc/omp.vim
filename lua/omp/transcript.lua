@@ -8,6 +8,19 @@ local flush_stream
 
 local function append(lines, colors)
   if not state.transcript or not vim.api.nvim_buf_is_valid(state.transcript) then return end
+  for _, line in ipairs(lines) do
+    if line:find("\n", 1, true) then
+      local split_lines, split_colors = {}, {}
+      for index, text in ipairs(lines) do
+        for _, part in ipairs(vim.split(text, "\n", { plain = true })) do
+          split_lines[#split_lines + 1] = part
+          split_colors[#split_lines] = colors and colors[index]
+        end
+      end
+      lines, colors = split_lines, split_colors
+      break
+    end
+  end
   if pending_stream then flush_stream() end
   local old_count = vim.api.nvim_buf_line_count(state.transcript)
   local follow = state.transcript_win and vim.api.nvim_win_is_valid(state.transcript_win)
