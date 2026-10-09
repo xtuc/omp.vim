@@ -47,7 +47,7 @@ nnoremap <silent> <leader>o :lua require('omp').open()<CR>
 
 ## Features
 
-- Independent transcript scroll, multiline prompt and error display, Markdown and tool output, approvals and todos.
+- Transcript auto-follows new output while prompt pane is selected; scroll independently when transcript pane is selected. Multiline prompts and errors, Markdown and tool output, approvals and todos.
 - Statusline: model, thinking, context, cost, activity; divider above prompt: running tasks, active commands, and named background bash/eval jobs.
 - RPC edit diffs use `difft` when available; unified-diff fallback.
 - Per-project sessions resume on reopen; large histories use paged RPC when available. Prompt history: 100 prompts from current RPC session, not terminal's global history.

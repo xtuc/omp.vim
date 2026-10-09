@@ -6,6 +6,22 @@ local reasoning_hl = vim.api.nvim_create_namespace("omp_reasoning")
 local pending_stream
 local flush_stream
 
+local function should_follow()
+  local win = state.transcript_win
+  return win and vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == state.transcript
+    and (vim.api.nvim_get_current_win() == state.prompt_win
+      or vim.api.nvim_win_get_cursor(win)[1] == vim.api.nvim_buf_line_count(state.transcript))
+end
+
+local function scroll_to_end(last_line)
+  local buf, win = state.transcript, state.transcript_win
+  if not buf or not vim.api.nvim_buf_is_valid(buf) or not win or not vim.api.nvim_win_is_valid(win)
+    or vim.api.nvim_win_get_buf(win) ~= buf then return end
+  local last = vim.api.nvim_buf_line_count(buf)
+  local line = last_line or vim.api.nvim_buf_get_lines(buf, last - 1, last, false)[1] or ""
+  vim.api.nvim_win_set_cursor(win, { last, #line })
+end
+
 local function append(lines, colors)
   if not state.transcript or not vim.api.nvim_buf_is_valid(state.transcript) then return end
   for _, line in ipairs(lines) do
@@ -23,8 +39,7 @@ local function append(lines, colors)
   end
   if pending_stream then flush_stream() end
   local old_count = vim.api.nvim_buf_line_count(state.transcript)
-  local follow = state.transcript_win and vim.api.nvim_win_is_valid(state.transcript_win)
-    and vim.api.nvim_win_get_cursor(state.transcript_win)[1] == old_count
+  local follow = should_follow()
   vim.bo[state.transcript].modifiable = true
   vim.api.nvim_buf_set_lines(state.transcript, -1, -1, false, lines)
   vim.bo[state.transcript].modifiable = false
@@ -34,9 +49,7 @@ local function append(lines, colors)
         { end_col = #lines[index], hl_group = group, priority = 150 })
     end
   end
-  if follow then
-    vim.api.nvim_win_set_cursor(state.transcript_win, { vim.api.nvim_buf_line_count(state.transcript), 0 })
-  end
+  if follow then scroll_to_end(lines[#lines]) end
 end
 
 local function append_todos(phases)
@@ -262,8 +275,7 @@ flush_stream = function()
   if not previous then return end
   local lines = vim.split(table.concat(pending.parts), "\n", { plain = true })
   lines[1] = previous .. lines[1]
-  local follow = state.transcript_win and vim.api.nvim_win_is_valid(state.transcript_win)
-    and vim.api.nvim_win_get_cursor(state.transcript_win)[1] == vim.api.nvim_buf_line_count(buf)
+  local follow = should_follow()
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, last, last + 1, false, lines)
   vim.bo[buf].modifiable = false
@@ -275,9 +287,7 @@ flush_stream = function()
     end
   end
   state[row_key] = last + #lines - 1
-  if follow then
-    vim.api.nvim_win_set_cursor(state.transcript_win, { vim.api.nvim_buf_line_count(buf), 0 })
-  end
+  if follow then scroll_to_end(lines[#lines]) end
 end
 
 local function stream_delta(row_key, delta, highlight)
@@ -298,6 +308,7 @@ local function stream_delta(row_key, delta, highlight)
   parts[#parts + 1] = delta
 end
 
+M.scroll_to_end = scroll_to_end
 M.append = append
 M.append_todos = append_todos
 M.append_block = append_block

@@ -1,5 +1,6 @@
 local state = require("omp.state")
-local append = require("omp.transcript").append
+local transcript = require("omp.transcript")
+local append = transcript.append
 local set_activity = require("omp.statusline").set_activity
 local render_statusline = require("omp.statusline").render_statusline
 local render_divider = require("omp.statusline").render_divider
@@ -50,7 +51,7 @@ function M.submit()
   append(lines, { [2] = "Question" })
   if state.transcript_win and vim.api.nvim_win_is_valid(state.transcript_win)
     and vim.api.nvim_win_get_buf(state.transcript_win) == state.transcript then
-    vim.api.nvim_win_set_cursor(state.transcript_win, { vim.api.nvim_buf_line_count(state.transcript), 0 })
+    transcript.scroll_to_end()
     vim.api.nvim_win_call(state.transcript_win, function() vim.cmd("normal! zb") end)
   end
   vim.api.nvim_buf_set_lines(state.prompt, 0, -1, false, { "" })
@@ -77,6 +78,7 @@ function M.open()
     vim.wo[state.transcript_win].statusline = "%#Normal#%{repeat(' ',winwidth(0))}"
     vim.wo[state.prompt_win].winbar = "%!v:lua.require'omp'.divider()"
     vim.api.nvim_set_current_win(state.prompt_win)
+    transcript.scroll_to_end()
     if not state.job then rpc.start() end
     return
   end
@@ -111,6 +113,12 @@ function M.open()
     vim.b[state.prompt].airline_disable_statusline = 1
     vim.bo[state.prompt].filetype = "omp"
     vim.bo[state.prompt].syntax = "markdown"
+    vim.api.nvim_create_autocmd("WinEnter", {
+      buffer = state.prompt,
+      callback = function()
+        if vim.api.nvim_get_current_win() == state.prompt_win then transcript.scroll_to_end() end
+      end,
+    })
     vim.keymap.set("n", "<CR>", M.submit, { buffer = state.prompt, desc = "Send prompt to Agent" })
     vim.keymap.set("n", "<C-c>", M.abort, { buffer = state.prompt, desc = "Abort Agent response" })
     vim.keymap.set("n", "<C-r>", pick_history, { buffer = state.prompt, desc = "Search Agent prompt history" })
