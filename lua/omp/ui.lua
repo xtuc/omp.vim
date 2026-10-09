@@ -14,6 +14,15 @@ local function history_key(direction, key)
   end
 end
 
+local function pick_history()
+  if #(state.prompt_history or {}) == 0 then return end
+  if vim.fn.exists(":CtrlP") ~= 2 then
+    vim.notify("Prompt history picker requires CtrlP", vim.log.levels.WARN)
+    return
+  end
+  vim.fn["ctrlp#init"](vim.fn["ctrlp#omp_history#id"]())
+end
+
 function M.submit()
   if not state.prompt or not vim.api.nvim_buf_is_valid(state.prompt) then return end
   local text = table.concat(vim.api.nvim_buf_get_lines(state.prompt, 0, -1, false), "\n")
@@ -104,6 +113,9 @@ function M.open()
     vim.bo[state.prompt].syntax = "markdown"
     vim.keymap.set("n", "<CR>", M.submit, { buffer = state.prompt, desc = "Send prompt to Agent" })
     vim.keymap.set("n", "<C-c>", M.abort, { buffer = state.prompt, desc = "Abort Agent response" })
+    vim.keymap.set("n", "<C-r>", pick_history, { buffer = state.prompt, desc = "Search Agent prompt history" })
+    vim.keymap.set("i", "<C-r>", "<Esc><C-r>",
+      { buffer = state.prompt, remap = true, desc = "Search Agent prompt history" })
     for _, binding in ipairs({ { "<Up>", -1 }, { "k", -1 }, { "<Down>", 1 }, { "j", 1 } }) do
       vim.keymap.set("n", binding[1], function() history_key(binding[2], binding[1]) end,
         { buffer = state.prompt, desc = "Navigate Agent prompt history" })

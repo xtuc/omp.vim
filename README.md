@@ -23,6 +23,7 @@ nnoremap <silent> <leader>o :lua require('omp').open()<CR>
 | Normal | `<Enter>` | Send prompt. From insert mode, press `<Esc>` first. |
 | Insert | `<Enter>` | Insert newline. |
 | Normal | `<C-c>` | Abort response. |
+| Normal or insert | `<C-r>` | Search prompt history with CtrlP. `<Enter>` loads selection without sending; `<Esc>` closes picker and keeps draft. |
 | Normal or insert | `<Up>` / `<Down>` | Browse history at first/last prompt line. `<Down>` past newest restores draft. |
 | Normal | `k` / `j` | Browse history at first/last prompt line. |
 

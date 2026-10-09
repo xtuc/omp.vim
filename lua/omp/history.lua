@@ -23,6 +23,31 @@ function M.restore(prompts)
   for _, text in ipairs(prompts) do M.add(text) end
 end
 
+function M.items()
+  local items = {}
+  for index, text in ipairs(state.prompt_history or {}) do
+    items[index] = index .. " " .. text:gsub("%s+", " ")
+  end
+  return items
+end
+
+function M.select(index)
+  local entries = state.prompt_history or {}
+  local text = entries[index]
+  local buf, win = state.prompt, state.prompt_win
+  if not text or not buf or not vim.api.nvim_buf_is_valid(buf)
+    or not win or not vim.api.nvim_win_is_valid(win) or vim.api.nvim_win_get_buf(win) ~= buf then return end
+  local current = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
+  if not state.history_index or current ~= entries[state.history_index] then
+    state.history_draft = current
+  end
+  state.history_index = index
+  local replacement = vim.split(text, "\n", { plain = true })
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, replacement)
+  vim.api.nvim_set_current_win(win)
+  vim.api.nvim_win_set_cursor(win, { #replacement, #replacement[#replacement] })
+end
+
 function M.navigate(direction)
   local buf = state.prompt
   if not buf or not vim.api.nvim_buf_is_valid(buf) then return false end
