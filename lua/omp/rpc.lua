@@ -37,6 +37,27 @@ local function refresh_statusline()
   M.send({ type = "get_session_stats" })
 end
 
+local function add_cost(usage)
+  local cost = usage and usage.cost and usage.cost.total
+  if type(cost) ~= "number" or cost <= 0 then return end
+  state.live_cost = (state.live_cost or (state.stats and state.stats.cost) or 0) + cost
+  vim.cmd("redrawstatus")
+end
+
+local function track_task_cost(task)
+  local id, cost = task.progress.id, task.progress.cost
+  if not state.ready or type(id) ~= "string" or type(cost) ~= "number" then return end
+  local previous = state.task_costs[id]
+  if previous then
+    if cost <= previous.cost then return end
+    state.pending_task_cost = state.pending_task_cost + cost - previous.cost
+    previous.cost = cost
+  else
+    state.task_costs[id] = { cost = cost, parent = task.parentToolCallId }
+    state.pending_task_cost = state.pending_task_cost + cost
+  end
+end
+
 local function update_task(id, index, status, label, named)
   if status == "started" or status == "running" then
     local previous = state.running_tasks[id]
@@ -105,6 +126,7 @@ local function handle(frame)
     update_task(task.id, task.index, task.status, task.description or task.agent, task.description ~= nil)
   elseif frame.type == "subagent_progress" then
     local task = frame.payload
+    track_task_cost(task)
     update_task(task.progress.id, task.index, task.progress.status, task.task or task.agent)
   elseif frame.type == "response" and not frame.success then
     if frame.command == "get_messages_page" and frame.code == "stale_cursor" then
@@ -150,6 +172,9 @@ local function handle(frame)
         state.displayed_session_id = nil
         state.session = nil
         state.stats = nil
+        state.live_cost = nil
+        state.task_costs = {}
+        state.pending_task_cost = 0
         state.running_tasks = {}
         state.running_jobs = {}
         state.running_commands = {}
@@ -228,12 +253,16 @@ local function handle(frame)
     refresh_statusline()
   elseif frame.type == "session_settled" then
     state.has_pending_async = false
+    state.task_costs = {}
+    state.pending_task_cost = 0
     set_activity(nil)
     state.running_jobs = {}
     state.running_commands = {}
     vim.cmd("redrawstatus")
     if history_waiting then request_history() end
+    if state.ready then M.send({ type = "get_session_stats" }) end
   elseif frame.type == "agent_start" then
+    state.live_cost = math.max(state.live_cost or 0, state.stats and state.stats.cost or 0)
     set_activity("Working")
   elseif frame.type == "command_output" then
     if type(frame.text) == "string" and frame.text:match("%S") then
@@ -285,11 +314,31 @@ local function handle(frame)
     elseif event and event.type == "text_end" then
       state.answer_row = nil
     end
-  elseif frame.type == "message_end" and frame.messageId == state.active then
-    state.active = nil
-    state.answer_row = nil
-    state.reason_row = nil
-    state.reason_pending = nil
+  elseif frame.type == "message_end" then
+    if frame.messageId == state.active then
+      state.active = nil
+      state.answer_row = nil
+      state.reason_row = nil
+      state.reason_pending = nil
+    end
+    local message = frame.message
+    if state.ready and message then
+      if message.role == "assistant" then
+        add_cost(message.usage)
+        M.send({ type = "get_session_stats" })
+      elseif message.role == "toolResult" and message.toolName == "task" then
+        if type(message.toolCallId) == "string" then
+          for id, task in pairs(state.task_costs) do
+            if task.parent == message.toolCallId then
+              state.pending_task_cost = state.pending_task_cost - task.cost
+              state.task_costs[id] = nil
+            end
+          end
+        end
+        add_cost(message.details and message.details.usage)
+        M.send({ type = "get_session_stats" })
+      end
+    end
   elseif frame.type == "tool_execution_start" then
     set_activity("Working")
     state.answer_row = nil
@@ -348,6 +397,9 @@ function M.start()
   state.partial = ""
   state.session = nil
   state.stats = nil
+  state.live_cost = nil
+  state.task_costs = {}
+  state.pending_task_cost = 0
   state.running_tasks = {}
   state.running_jobs = {}
   state.running_commands = {}
@@ -398,6 +450,9 @@ function M.start()
       history_waiting = false
       state.session = nil
       state.stats = nil
+      state.live_cost = nil
+      state.task_costs = {}
+      state.pending_task_cost = 0
       state.running_tasks = {}
       state.running_jobs = {}
       state.running_commands = {}

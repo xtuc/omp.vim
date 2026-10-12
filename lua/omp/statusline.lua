@@ -55,7 +55,8 @@ function M.render_statusline()
   if usage then window = usage.contextWindow or window end
   local context = (usage and window > 0 and string.format("%.1f%%", usage.percent) or "?")
     .. "/" .. (window > 0 and short_number(window) or "?")
-  local cost = string.format("$%.3f", stats.cost or 0)
+  local cost = string.format("$%.3f", math.max(stats.cost or 0, state.live_cost or 0)
+    + (state.pending_task_cost or 0))
   local essential = context .. " " .. cost
   local activity = state.activity and (spinner[state.spin or 1] .. " " .. state.activity .. "…") or "Ready"
   local effort = model and model.thinking and type(state.session.thinkingLevel) == "string"
