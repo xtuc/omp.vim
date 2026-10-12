@@ -6,6 +6,7 @@ local render_statusline = require("omp.statusline").render_statusline
 local render_divider = require("omp.statusline").render_divider
 local rpc = require("omp.rpc")
 local history = require("omp.history")
+local approvals = require("omp.approvals")
 
 local M = {}
 
@@ -42,6 +43,23 @@ function M.submit()
     vim.api.nvim_buf_set_lines(state.prompt, 0, -1, false, { "" })
     return
   end
+  if text:match("^%s*/approvals%s*$") then
+    local data, path, err = approvals.list()
+    if err then
+      append({ "Approval list error: " .. tostring(err) })
+    else
+      local lines = { "Approved tools: " .. path }
+      for _, title in ipairs(data.commands) do
+        local parts = vim.split(title, "\n", { plain = true })
+        lines[#lines + 1] = parts[1]
+        for i = 2, #parts do lines[#lines + 1] = "    " .. parts[i] end
+      end
+      if #lines == 1 then lines[#lines + 1] = "(none)" end
+      append(lines)
+    end
+    vim.api.nvim_buf_set_lines(state.prompt, 0, -1, false, { "" })
+    return
+  end
   state.next_id = state.next_id + 1
   if not rpc.send({ id = tostring(state.next_id), type = "prompt", message = text, streamingBehavior = "steer" }) then return end
   history.add(text)
@@ -70,6 +88,7 @@ function M.divider()
 end
 
 function M.open()
+  if require("omp.dialog").focus_confirmation() then return end
   if state.prompt_win and vim.api.nvim_win_is_valid(state.prompt_win)
     and vim.api.nvim_win_get_buf(state.prompt_win) == state.prompt
     and state.transcript_win and vim.api.nvim_win_is_valid(state.transcript_win)

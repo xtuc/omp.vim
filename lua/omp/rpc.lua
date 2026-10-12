@@ -416,7 +416,7 @@ function M.start()
     local branch = vim.fn.systemlist({ "git", "-C", state.cwd, "branch", "--show-current" })[1]
     if vim.v.shell_error == 0 and branch ~= "" then state.branch = branch end
   end
-  local job = vim.fn.jobstart({ bun, omp, "--mode", "rpc", "--session-dir", state.session_dir }, {
+  local job = vim.fn.jobstart({ bun, omp, "--mode", "rpc-ui", "--session-dir", state.session_dir }, {
     cwd = state.cwd,
     env = { DFT_WIDTH = tostring(vim.api.nvim_win_get_width(state.transcript_win)) },
     on_stdout = function(id, data)
