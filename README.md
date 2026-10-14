@@ -38,6 +38,8 @@ nnoremap <silent> <leader>o :lua require('omp').open()<CR>
 
 Choices and approvals replace prompt pane temporarily; existing prompt draft returns afterward. This is a read-only selection view, not a text field: `> ` marks selected option. Request details appear below options. Pane keeps its width, grows vertically for details, and wraps long lines; use `j` / `k` or arrows to scroll, then return to an option before pressing `<Enter>`. Input and multiline editor still open popups.
 
+On Linux, approvals and questions show desktop alerts. Alerts stay until answered or dismissed.
+
 | Dialog | Mode | Keys | Action |
 | --- | --- | --- | --- |
 | Choice or approval | Normal | `<Enter>` | Select option under cursor. On detail text, `<Enter>` does nothing. |
@@ -53,6 +55,7 @@ Choices and approvals replace prompt pane temporarily; existing prompt draft ret
 ## Features
 
 - Transcript auto-follows new output while prompt pane is selected; scroll independently when transcript pane is selected. Multiline prompts and errors, Markdown and tool output, approvals and todos.
+- Transcript, prompt, and dialogs word-wrap.
 - Statusline: model, thinking, context, cost, activity; divider above prompt: running tasks, active commands, and named background bash/eval jobs.
 - Auto-compaction start and outcome appear in transcript; statusline shows `Compacting`. On reconnect, retained compaction summaries appear in history. Manual `/compact` reports completion through command output.
 - RPC edit diffs use `difft` when available; unified-diff fallback.
@@ -78,3 +81,4 @@ Approvals live alongside project session history in `~/.omp/agent/sessions/<proj
 
 - Neovim, Bun, and oh-my-pi (`omp`). The RPC launcher expects `~/.bun/bin/bun` and `~/.bun/bin/omp` even if Neovim's `PATH` differs.
 - `difft` is optional; without it, edit results use unified diffs.
+- Linux desktop alerts need `notify-send`, `gdbus`, and a notification service (all optional).

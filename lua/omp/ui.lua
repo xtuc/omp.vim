@@ -156,7 +156,7 @@ function M.open()
   state.transcript_win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(state.transcript_win, state.transcript)
   vim.wo[state.transcript_win].wrap = true
-  vim.wo[state.transcript_win].linebreak = false
+  vim.wo[state.transcript_win].linebreak = true
   vim.wo[state.transcript_win].number = false
   vim.wo[state.transcript_win].relativenumber = false
   vim.wo[state.transcript_win].signcolumn = "no"
@@ -165,7 +165,7 @@ function M.open()
   state.prompt_win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(state.prompt_win, state.prompt)
   vim.wo[state.prompt_win].wrap = true
-  vim.wo[state.prompt_win].linebreak = false
+  vim.wo[state.prompt_win].linebreak = true
   vim.wo[state.prompt_win].number = false
   vim.wo[state.prompt_win].relativenumber = false
   vim.wo[state.prompt_win].signcolumn = "no"

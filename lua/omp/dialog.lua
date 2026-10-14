@@ -8,6 +8,41 @@ local active_choice
 local clearing = false
 local show_next
 local selection_ns = vim.api.nvim_create_namespace("omp_dialog_selection")
+local function close_notification(pending)
+  local notification = pending.notification
+  if not notification then return end
+  notification.closed = true
+  if not notification.id then return end
+  vim.fn.jobstart({ "gdbus", "call", "--session", "--dest=org.freedesktop.Notifications",
+    "--object-path=/org/freedesktop/Notifications",
+    "--method=org.freedesktop.Notifications.CloseNotification", "uint32 " .. notification.id }, { detach = true })
+  notification.id = nil
+end
+
+local function notification_text(text)
+  return text:gsub("[%c]", " "):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
+end
+
+local function notify_request(pending, kind)
+  if vim.uv.os_uname().sysname ~= "Linux" or vim.fn.executable("notify-send") == 0
+    or vim.fn.executable("gdbus") == 0 then return end
+  local notification = { closed = false }
+  pending.notification = notification
+  local cwd = state.cwd or vim.fn.getcwd()
+  local project = vim.fn.fnamemodify(cwd, ":t")
+  if project == "" then project = "root" end
+  vim.fn.jobstart({ "notify-send", "--app-name=omp", "--expire-time=0", "--print-id",
+    "--hint=string:frcolor:#d55e00",
+    (kind == "approval" and "Agent Approval" or "OMP question") .. " · " .. notification_text(project),
+    "Review and respond in Neovim." }, {
+    stdout_buffered = true,
+    on_stdout = function(_, output)
+      notification.id = tonumber(output[1])
+      if notification.id and notification.closed then close_notification(pending) end
+    end,
+  })
+end
+
 
 local function dismiss(pending)
   if pending.inline then
@@ -37,6 +72,7 @@ end
 local function cancel(id)
   local pending = state.pending[id]
   if not pending then return end
+  close_notification(pending)
   state.pending[id] = nil
   if active_choice == pending then
     active_choice = nil
@@ -98,6 +134,7 @@ local function open_float(request, lines, send, editable)
     width = width, height = height, border = "single", title = request.title,
   })
   vim.wo[win].wrap = true
+  vim.wo[win].linebreak = true
   vim.wo[win].cursorline = not editable
   local pending = track(request, buf, win, send)
   local function cancelled() respond(request, pending, dismissal(request), send) end
@@ -204,6 +241,7 @@ show_next = function()
     vim.keymap.set("n", "a", function() respond(request, pending, { confirmed = true }, send) end, { buffer = buf })
     vim.keymap.set("n", "r", function() respond(request, pending, { confirmed = false }, send) end, { buffer = buf })
   end
+  notify_request(pending, (tool_approval or request.method == "confirm") and "approval" or "question")
 end
 
 function M.focus_confirmation()
@@ -253,6 +291,7 @@ function M.handle(request, send)
       respond(request, pending, { cancelled = true }, send)
     end, { buffer = buf })
     vim.cmd("startinsert")
+    notify_request(pending, "question")
   elseif request.method == "editor" then
     local buf = vim.api.nvim_create_buf(false, true)
     local lines = vim.split(request.prefill or "", "\n", { plain = true })
@@ -264,11 +303,14 @@ function M.handle(request, send)
       col = math.max(0, math.floor((vim.o.columns - width) / 2)),
       width = width, height = height, border = "single", title = request.title,
     })
+    vim.wo[win].wrap = true
+    vim.wo[win].linebreak = true
     local pending = track(request, buf, win, send)
     vim.keymap.set("n", "<CR>", function()
       respond(request, pending, { value = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n") }, send)
     end, { buffer = buf })
     vim.keymap.set("n", "q", function() respond(request, pending, { cancelled = true }, send) end, { buffer = buf })
+    notify_request(pending, "question")
   elseif request.method == "open_url" then
     append({ request.instructions or "Open URL:", request.launchUrl or request.url })
   end
