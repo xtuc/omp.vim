@@ -7,6 +7,7 @@ local history = require("omp.history")
 local append = transcript.append
 local append_todos = transcript.append_todos
 local append_block = transcript.append_block
+local append_compaction = transcript.append_compaction
 local append_reasoning = transcript.append_reasoning
 local append_result = transcript.append_result
 local append_call = transcript.append_call
@@ -225,7 +226,11 @@ local function handle(frame)
     end
     state.session = frame.data
     state.has_pending_async = frame.data.hasPendingAsyncWork
-    if frame.data.isSettled == false and not state.activity then set_activity("Working") end
+    if frame.data.isCompacting then
+      set_activity("Compacting")
+    elseif frame.data.isSettled == false and not state.activity then
+      set_activity("Working")
+    end
     vim.cmd("redrawstatus")
     if not state.ready then
       state.session_id = frame.data.sessionId
@@ -264,6 +269,19 @@ local function handle(frame)
   elseif frame.type == "agent_start" then
     state.live_cost = math.max(state.live_cost or 0, state.stats and state.stats.cost or 0)
     set_activity("Working")
+  elseif frame.type == "auto_compaction_start" then
+    set_activity("Compacting")
+    append_compaction("Auto-compaction started (" .. frame.action .. ", " .. frame.reason .. ")", nil, "Identifier")
+  elseif frame.type == "auto_compaction_end" then
+    local outcome = frame.aborted and "cancelled" or frame.skipped and "skipped"
+      or frame.errorMessage and "failed" or "completed"
+    local group = frame.errorMessage and "DiagnosticError" or frame.aborted and "DiagnosticWarn" or "Identifier"
+    append_compaction("Auto-compaction " .. outcome .. " (" .. frame.action .. ")",
+      frame.result, group, frame.errorMessage)
+    set_activity(frame.willRetry and "Working" or nil)
+    if frame.result or (not frame.aborted and not frame.skipped and not frame.errorMessage) then
+      refresh_statusline()
+    end
   elseif frame.type == "command_output" then
     if type(frame.text) == "string" and frame.text:match("%S") then
       append_block("Output", vim.split(frame.text, "\n", { plain = true }), "String")

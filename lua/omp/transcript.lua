@@ -85,6 +85,25 @@ local function append_block(title, body, group, diff)
   append(lines, colors)
 end
 
+local function append_compaction(title, details, group, note)
+  local lines = {}
+  if type(details) == "table" then
+    if type(details.tokensBefore) == "number" then
+      local tokens = "Tokens before: " .. details.tokensBefore
+      if type(details.tokensAfter) == "number" then tokens = tokens .. ", after: " .. details.tokensAfter end
+      lines[#lines + 1] = tokens
+    end
+    if type(details.shortSummary) == "string" and details.shortSummary ~= "" then
+      lines[#lines + 1] = details.shortSummary
+    end
+    if type(details.warning) == "string" and details.warning ~= "" then
+      lines[#lines + 1] = details.warning
+    end
+  end
+  if type(note) == "string" and note ~= "" then lines[#lines + 1] = note end
+  append_block(title, lines, group)
+end
+
 local function append_reasoning(text)
   local lines, colors = { "" }, {}
   for _, line in ipairs(vim.split(text, "\n", { plain = true })) do
@@ -253,6 +272,9 @@ local function restore_history(messages)
           append_call(block.name, block.arguments, block.intent)
         end
       end
+    elseif message.role == "compactionSummary" then
+      local method = type(message.method) == "string" and " (" .. message.method .. ")" or ""
+      append_compaction("Compaction" .. method, message, "Identifier")
     elseif message.role == "toolResult" then
       if message.toolName == "todo" and type(message.details) == "table"
         and type(message.details.phases) == "table" then
@@ -315,6 +337,7 @@ M.append_block = append_block
 M.append_reasoning = append_reasoning
 M.append_result = append_result
 M.append_call = append_call
+M.append_compaction = append_compaction
 M.restore_history = restore_history
 M.stream_delta = stream_delta
 M.flush_stream = flush_stream

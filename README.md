@@ -54,6 +54,7 @@ Choices and approvals replace prompt pane temporarily; existing prompt draft ret
 
 - Transcript auto-follows new output while prompt pane is selected; scroll independently when transcript pane is selected. Multiline prompts and errors, Markdown and tool output, approvals and todos.
 - Statusline: model, thinking, context, cost, activity; divider above prompt: running tasks, active commands, and named background bash/eval jobs.
+- Auto-compaction start and outcome appear in transcript; statusline shows `Compacting`. On reconnect, retained compaction summaries appear in history. Manual `/compact` reports completion through command output.
 - RPC edit diffs use `difft` when available; unified-diff fallback.
 - Per-project sessions resume on reopen; large histories use paged RPC when available. Prompt history: 100 prompts from current RPC session, not terminal's global history.
 - Prompt stays editable during tool calls, including `wait`. Send a message to steer; OMP interrupts an interruptible wait, backgrounds the still-running command, and handles the message. Background jobs leave the divider when their result arrives. Changed clean file buffers reload after tools.
