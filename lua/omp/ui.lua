@@ -64,9 +64,7 @@ function M.submit()
   if not rpc.send({ id = tostring(state.next_id), type = "prompt", message = text, streamingBehavior = "steer" }) then return end
   history.add(text)
   set_activity("Working")
-  local lines = { "", "You" }
-  vim.list_extend(lines, vim.split(text, "\n", { plain = true }))
-  append(lines, { [2] = "Question" })
+  transcript.append_markdown(text, "You", "Question")
   if state.transcript_win and vim.api.nvim_win_is_valid(state.transcript_win)
     and vim.api.nvim_win_get_buf(state.transcript_win) == state.transcript then
     transcript.scroll_to_end()
@@ -119,6 +117,10 @@ function M.open()
     end
     vim.api.nvim_buf_set_lines(state.transcript, 0, -1, false, { "Agent starting..." })
     vim.bo[state.transcript].modifiable = false
+    vim.api.nvim_create_autocmd({ "WinResized", "VimResized" }, {
+      group = vim.api.nvim_create_augroup("omp_table_resize", { clear = true }),
+      callback = function() transcript.resize_tables() end,
+    })
     for _, key in ipairs({ "i", "I", "a", "A", "o", "O", "s", "S", "R", "C", "gi", "gI" }) do
       vim.keymap.set("n", key, function()
         M.open()
@@ -173,6 +175,7 @@ function M.open()
   vim.wo[state.prompt_win].winbar = "%!v:lua.require'omp'.divider()"
   vim.api.nvim_win_set_height(state.prompt_win, 4)
   vim.wo[state.prompt_win].winfixheight = true
+  transcript.resize_tables()
   vim.api.nvim_set_current_win(state.prompt_win)
   if not state.job then rpc.start() end
 end

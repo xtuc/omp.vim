@@ -1,8 +1,11 @@
 local M = {}
 
 local state = require('omp.state')
+local tables = require('omp.tables')
 local transcript_hl = vim.api.nvim_create_namespace("omp_transcript")
 local reasoning_hl = vim.api.nvim_create_namespace("omp_reasoning")
+local table_hl = vim.api.nvim_create_namespace("omp_tables")
+local table_blocks = {}
 local pending_stream
 local flush_stream
 
@@ -50,6 +53,55 @@ local function append(lines, colors)
     end
   end
   if follow then scroll_to_end(lines[#lines]) end
+end
+
+local function table_width()
+  local win = state.transcript_win
+  if not win or not vim.api.nvim_win_is_valid(win) then return nil end
+  return vim.api.nvim_win_get_width(win) - vim.fn.getwininfo(win)[1].textoff
+end
+
+local function render_tables(first, last)
+  local width = table_width()
+  if not width or first > last then return end
+  local buf = state.transcript
+  local raw = vim.api.nvim_buf_get_lines(buf, first, last + 1, false)
+  local lines, changed = tables.render(raw, width)
+  if not changed then return end
+  local id = vim.api.nvim_buf_set_extmark(buf, table_hl, first, 0, { right_gravity = false })
+  table_blocks[#table_blocks + 1] = { id = id, raw = raw, count = #raw }
+  local follow = should_follow()
+  vim.bo[buf].modifiable = true
+  vim.api.nvim_buf_set_lines(buf, first, last + 1, false, lines)
+  vim.bo[buf].modifiable = false
+  table_blocks[#table_blocks].count = #lines
+  if follow then scroll_to_end() end
+end
+
+local function append_markdown(text, title, group)
+  local lines = { "", title }
+  vim.list_extend(lines, vim.split(text, "\n", { plain = true }))
+  append(lines, { [2] = group })
+  local last = vim.api.nvim_buf_line_count(state.transcript) - 1
+  render_tables(last - #lines + 3, last)
+end
+
+local function resize_tables()
+  local width = table_width()
+  if not width or not state.transcript or not vim.api.nvim_buf_is_valid(state.transcript) then return end
+  local buf, follow = state.transcript, should_follow()
+  for index = #table_blocks, 1, -1 do
+    local block = table_blocks[index]
+    local mark = vim.api.nvim_buf_get_extmark_by_id(buf, table_hl, block.id, {})
+    if #mark > 0 then
+      local lines = tables.render(block.raw, width)
+      vim.bo[buf].modifiable = true
+      vim.api.nvim_buf_set_lines(buf, mark[1], mark[1] + block.count, false, lines)
+      vim.bo[buf].modifiable = false
+      block.count = #lines
+    end
+  end
+  if follow and #table_blocks > 0 then scroll_to_end() end
 end
 
 local function append_todos(phases)
@@ -250,24 +302,22 @@ local function restore_history(messages)
   vim.bo[buf].modifiable = false
   vim.api.nvim_buf_clear_namespace(buf, transcript_hl, 0, -1)
   vim.api.nvim_buf_clear_namespace(buf, reasoning_hl, 0, -1)
+  vim.api.nvim_buf_clear_namespace(buf, table_hl, 0, -1)
+  table_blocks = {}
   local prompts = {}
   for _, message in ipairs(messages) do
     if message.role == "user" then
       local text = content_text(message.content)
       if text ~= "" then
         prompts[#prompts + 1] = text
-        local lines = { "", "You" }
-        vim.list_extend(lines, vim.split(text, "\n", { plain = true }))
-        append(lines, { [2] = "Question" })
+        append_markdown(text, "You", "Question")
       end
     elseif message.role == "assistant" then
       for _, block in ipairs(type(message.content) == "table" and message.content or {}) do
         if block.type == "thinking" and type(block.thinking) == "string" and block.thinking:match("%S") then
           append_reasoning(block.thinking)
         elseif block.type == "text" and type(block.text) == "string" and block.text ~= "" then
-          local lines = { "", "Agent" }
-          vim.list_extend(lines, vim.split(block.text, "\n", { plain = true }))
-          append(lines, { [2] = "Title" })
+          append_markdown(block.text, "Agent", "Title")
         elseif block.type == "toolCall" then
           append_call(block.name, block.arguments, block.intent)
         end
@@ -332,12 +382,15 @@ end
 
 M.scroll_to_end = scroll_to_end
 M.append = append
+M.append_markdown = append_markdown
 M.append_todos = append_todos
 M.append_block = append_block
 M.append_reasoning = append_reasoning
 M.append_result = append_result
 M.append_call = append_call
 M.append_compaction = append_compaction
+M.render_tables = render_tables
+M.resize_tables = resize_tables
 M.restore_history = restore_history
 M.stream_delta = stream_delta
 M.flush_stream = flush_stream

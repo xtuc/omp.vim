@@ -113,6 +113,14 @@ local function finish_session_open()
   end
 end
 
+local function finish_answer()
+  if state.answer_start and state.answer_row then
+    transcript.render_tables(state.answer_start, state.answer_row)
+  end
+  state.answer_start = nil
+  state.answer_row = nil
+end
+
 local function handle(frame)
   local event = frame.assistantMessageEvent
   if frame.type ~= "message_update" or not event
@@ -183,6 +191,7 @@ local function handle(frame)
         state.todo_seen = false
         state.active = nil
         state.answer_row = nil
+        state.answer_start = nil
         state.reason_row = nil
         state.reason_pending = nil
         set_activity(nil)
@@ -292,6 +301,7 @@ local function handle(frame)
     set_activity("Working")
     state.active = frame.messageId
     state.answer_row = nil
+    state.answer_start = nil
     state.reason_row = nil
     state.reason_pending = nil
   elseif frame.type == "message_update" and frame.messageId == state.active then
@@ -326,16 +336,17 @@ local function handle(frame)
       if not state.answer_row then set_activity("Working") end
       if not state.answer_row then
         append({ "", "Agent", "" }, { [2] = "Title" })
+        state.answer_start = vim.api.nvim_buf_line_count(state.transcript) - 1
         state.answer_row = vim.api.nvim_buf_line_count(state.transcript) - 1
       end
       stream_delta("answer_row", event.delta, nil)
     elseif event and event.type == "text_end" then
-      state.answer_row = nil
+      finish_answer()
     end
   elseif frame.type == "message_end" then
     if frame.messageId == state.active then
+      finish_answer()
       state.active = nil
-      state.answer_row = nil
       state.reason_row = nil
       state.reason_pending = nil
     end
@@ -359,7 +370,7 @@ local function handle(frame)
     end
   elseif frame.type == "tool_execution_start" then
     set_activity("Working")
-    state.answer_row = nil
+    finish_answer()
     if (frame.toolName == "bash" or frame.toolName == "eval") and frame.toolCallId then
       local args = type(frame.args) == "table" and frame.args or {}
       local label = frame.intent or args.i or args.title or args.command or frame.toolName
