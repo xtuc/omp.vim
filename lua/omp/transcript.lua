@@ -248,7 +248,7 @@ local function append_result(result, tool_name, is_error)
     end
     if has_text then
       local group = "String"
-      if tool_name == "eval" or tool_name == "bash" or tool_name == "glob" or tool_name == "write" or tool_name == "wait" or tool_name == "task" then
+      if tool_name == "eval" or tool_name == "bash" or tool_name == "glob" or tool_name == "write" or tool_name == "wait" or tool_name == "task" or tool_name == "grep" then
         group = "Comment"
       end
       if (is_error or result.isError) and (tool_name == "glob" or tool_name == "write" or tool_name == "wait" or group == "String") then
