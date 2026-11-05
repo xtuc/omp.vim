@@ -43,6 +43,20 @@ function M.submit()
     vim.api.nvim_buf_set_lines(state.prompt, 0, -1, false, { "" })
     return
   end
+  if text:lower():match("^%s*/deepseek%s*$") then
+    if not rpc.send({ type = "set_model", provider = "opencode-cf",
+      modelId = "@cf/deepseek-ai/deepseek-v4.1-flash-1017" }) then return end
+    if not rpc.send({ type = "set_thinking_level", level = "high" }) then return end
+    history.add(text)
+    vim.api.nvim_buf_set_lines(state.prompt, 0, -1, false, { "" })
+    return
+  end
+  if text:lower():match("^%s*/sol%s*$") then
+    if not rpc.send({ type = "set_model", provider = "opencode-cf", modelId = "gpt-6-sol" }) then return end
+    history.add(text)
+    vim.api.nvim_buf_set_lines(state.prompt, 0, -1, false, { "" })
+    return
+  end
   if text:match("^%s*/approvals%s*$") then
     local data, path, err = approvals.list()
     if err then

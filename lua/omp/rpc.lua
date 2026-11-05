@@ -257,6 +257,8 @@ local function handle(frame)
     vim.cmd("redrawstatus")
   elseif frame.type == "response" and frame.command == "set_thinking_level" then
     refresh_statusline()
+  elseif frame.type == "response" and frame.command == "set_model" then
+    refresh_statusline()
   elseif frame.type == "prompt_result" then
     set_activity(frame.sessionSettled == false and "Working" or nil)
     if frame.status == "error" then
