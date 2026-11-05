@@ -213,14 +213,14 @@ local function difft_preview(file)
   return lines, colors
 end
 
-local function append_diff(file, tool_name)
+local function append_diff(file, tool_name, source)
   if type(file.diff) ~= "string" or file.diff == "" then return end
   local lines, colors = difft_preview(file)
-  append_block("Diff: " .. (file.path or tool_name),
+  append_block("Diff: " .. (source and source .. " · " or "") .. (file.path or tool_name),
     lines or vim.split(file.diff, "\n", { plain = true }), "Identifier", colors or true)
 end
 
-local function append_result(result, tool_name, is_error)
+local function append_result(result, tool_name, is_error, source)
   if type(result) ~= "table" then return end
   local empty_bash_seconds
   if tool_name == "bash" and not (is_error or result.isError)
@@ -254,7 +254,7 @@ local function append_result(result, tool_name, is_error)
       if (is_error or result.isError) and (tool_name == "glob" or tool_name == "write" or tool_name == "wait" or group == "String") then
         group = "DiagnosticError"
       end
-      append_block("Output: " .. tool_name, lines, group)
+      append_block("Output: " .. (source and source .. " · " or "") .. tool_name, lines, group)
     end
   end
 
@@ -263,10 +263,10 @@ local function append_result(result, tool_name, is_error)
   local files = type(details.perFileResults) == "table" and details.perFileResults or nil
   if files and #files > 0 then
     for _, file in ipairs(files) do
-      append_diff(file, tool_name)
+      append_diff(file, tool_name, source)
     end
   elseif type(details.diff) == "string" and details.diff ~= "" then
-    append_diff(details, tool_name)
+    append_diff(details, tool_name, source)
   end
 end
 

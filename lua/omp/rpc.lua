@@ -73,6 +73,12 @@ local function update_task(id, index, status, label, named)
   vim.cmd("redrawstatus")
 end
 
+local function subagent_label(id)
+  local task = state.running_tasks[id]
+  if not task then return "Subagent " .. id end
+  return "Subagent #" .. task.index .. " (" .. task.label .. ")"
+end
+
 local function update_jobs(jobs, delivered)
   if type(jobs) ~= "table" then return end
   for _, job in ipairs(jobs) do
@@ -123,12 +129,12 @@ end
 
 local function handle(frame)
   local event = frame.assistantMessageEvent
-  if frame.type ~= "message_update" or not event
-    or (event.type ~= "text_delta" and event.type ~= "thinking_delta") then
+  if frame.type ~= "subagent_event" and (frame.type ~= "message_update" or not event
+    or (event.type ~= "text_delta" and event.type ~= "thinking_delta")) then
     transcript.flush_stream()
   end
   if frame.type == "ready" then
-    M.send({ type = "set_subagent_subscription", level = "progress" }, true)
+    M.send({ type = "set_subagent_subscription", level = "events" }, true)
     M.send({ type = "open_session", sessionDir = state.session_dir }, true)
   elseif frame.type == "subagent_lifecycle" then
     local task = frame.payload
@@ -137,6 +143,27 @@ local function handle(frame)
     local task = frame.payload
     track_task_cost(task)
     update_task(task.progress.id, task.index, task.progress.status, task.task or task.agent)
+  elseif frame.type == "subagent_event" then
+    local payload = frame.payload
+    local child = payload.event
+    if child.type == "tool_execution_start" and (child.toolName == "edit" or child.toolName == "write") then
+      local args = type(child.args) == "table" and child.args or {}
+      local intent = child.intent or args.i
+      append_call(child.toolName, args, subagent_label(payload.id) .. (intent and " · " .. intent or ""))
+    elseif child.type == "tool_execution_end" then
+      local details = child.result and child.result.details
+      local has_diff = type(details) == "table" and (type(details.diff) == "string"
+        or type(details.perFileResults) == "table" and #details.perFileResults > 0)
+      if child.toolName == "edit" or child.toolName == "write" or has_diff then
+        local source = subagent_label(payload.id)
+        if child.toolName ~= "edit" and child.toolName ~= "write" then
+          append({ "- " .. source .. ": " .. child.toolName }, { [1] = "Comment" })
+        end
+        if child.isError then append({ "✗ " .. source .. " " .. child.toolName }, { [1] = "DiagnosticError" }) end
+        append_result(child.result, child.toolName, child.isError, source)
+        vim.cmd("checktime")
+      end
+    end
   elseif frame.type == "response" and not frame.success then
     if frame.command == "get_messages_page" and frame.code == "stale_cursor" then
       request_history()
