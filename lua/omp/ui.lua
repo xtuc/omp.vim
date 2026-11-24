@@ -187,7 +187,7 @@ function M.open()
   vim.wo[state.prompt_win].signcolumn = "no"
   vim.wo[state.prompt_win].statusline = "%!v:lua.require'omp'.statusline()"
   vim.wo[state.prompt_win].winbar = "%!v:lua.require'omp'.divider()"
-  vim.api.nvim_win_set_height(state.prompt_win, 4)
+  vim.api.nvim_win_set_height(state.prompt_win, 10)
   vim.wo[state.prompt_win].winfixheight = true
   transcript.resize_tables()
   vim.api.nvim_set_current_win(state.prompt_win)
